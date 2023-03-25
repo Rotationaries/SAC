@@ -4,9 +4,32 @@
 
 package frc.robot;
 
+import com.pathplanner.lib.PathPlanner;
+import com.pathplanner.lib.PathPlannerTrajectory;
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.REVPhysicsSim;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+
+//import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.simulation.BatterySim;
+import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.Constants.AutoConstants;
+import frc.robot.Constants.CascadeConstants;
+import frc.robot.subsystems.Arm;
+import frc.robot.subsystems.Cascade;
+//import frc.robot.subsystems.Cascade;
+import frc.robot.subsystems.Drivetrain;
+// import frc.robot.subsystems.Intake;
+import frc.robot.subsystems.Intake;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -16,8 +39,23 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
  */
 public class Robot extends TimedRobot {
   private Command m_autonomousCommand;
-
+  NetworkTable table = NetworkTableInstance.getDefault().getTable("OI");
+    NetworkTableEntry tx = table.getEntry("ForwardBackward");
+    NetworkTableEntry ty = table.getEntry("Turning");
+    NetworkTableEntry ta = table.getEntry("TurningSens");
   private RobotContainer m_robotContainer;
+
+  private Drivetrain m_drive = new Drivetrain();
+  private Cascade m_cascade = new Cascade();
+  private Arm m_arm = new Arm();
+  private Intake m_intake = new Intake();
+
+  private CANSparkMax  armMotor = new CANSparkMax(8, MotorType.kBrushless);
+
+  private XboxController controller = new XboxController(0);
+   private Joystick joystick = new Joystick (1);
+
+
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -28,6 +66,8 @@ public class Robot extends TimedRobot {
     // Instantiate our RobotContainer.  This will perform all our button bindings, and put our
     // autonomous chooser on the dashboard.
     m_robotContainer = new RobotContainer();
+
+    setNetworkTablesFlushEnabled(true);
   }
 
   /**
@@ -48,7 +88,10 @@ public class Robot extends TimedRobot {
 
   /** This function is called once each time the robot enters Disabled mode. */
   @Override
-  public void disabledInit() {}
+  public void disabledInit() {
+    CommandScheduler.getInstance().cancelAll();
+    m_robotContainer.zeroAllOutputs();
+  }
 
   @Override
   public void disabledPeriodic() {}
@@ -56,17 +99,39 @@ public class Robot extends TimedRobot {
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
-    m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+    //m_drive.arcadeDrive(.5, 0);
+    
+    //  m_autonomousCommand = m_robotContainer.getAutonomousCommand();
 
-    // schedule the autonomous command (example)
-    if (m_autonomousCommand != null) {
-      m_autonomousCommand.schedule();
-    }
+    // // // // schedule the autonomous command (example)
+    // if (m_autonomousCommand != null) {
+    //   m_autonomousCommand.schedule();
+    // }
+
+
+    //PathPlannerTrajectory traj = PathPlanner.loadPath("TestNew", AutoConstants.kMaxSpeedMetersPerSecond, 
+    //  AutoConstants.kMaxAccelerationMetersPerSecondSquared);
+    //  System.out.println(traj);
+      
+    //m_cascade.autoCascadeDrive(Constants.CascadeConstants.pos1);*/
+
+    
   }
 
   /** This function is called periodically during autonomous. */
   @Override
-  public void autonomousPeriodic() {}
+  public void autonomousPeriodic() {
+    // System.out.println(m_drive.getPose());
+    //m_drive.arcadeDrive(0.5,0);
+    //CommandScheduler.getInstance().run();// double x = tx.getDouble(0.0);
+    // double y = ty.getDouble(0.0);
+    // double area = ta.getDouble(0.0);
+
+    // SmartDashboard.putNumber("ForwardBackward", );
+    // SmartDashboard.putNumber("Turning", y);
+    // SmartDashboard.putNumber("TurningSens", area);
+    
+  }
 
   @Override
   public void teleopInit() {
@@ -81,7 +146,28 @@ public class Robot extends TimedRobot {
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
+  public void teleopPeriodic() {
+    m_drive.arcadeDrive(-controller.getLeftY(), 0.9 * -controller.getRightX());
+    // m_drive.controllerMovement(controller);
+    //m_cascade.cascadeStagedDrive();
+    m_cascade.joyCascade();
+    // //m_cascade.autoCascadeDrive(CascadeConstants.pos3FromPos2);
+    // //m_cascade.testMotors();
+     //m_arm.armDrive();
+    m_intake.intakeDrive();
+
+    if (joystick.getRawButton(3)){
+      armMotor.set(0.35);
+    }
+    else if (joystick.getRawButton(4)){
+      armMotor.set(-0.15);
+    }
+    else {armMotor.set(0);}
+
+    
+    //m_drive.arcadeDrive(0.5, 0);
+
+  }
 
   @Override
   public void testInit() {
@@ -95,9 +181,19 @@ public class Robot extends TimedRobot {
 
   /** This function is called once when the robot is first started up. */
   @Override
-  public void simulationInit() {}
+  public void simulationInit() {
+    REVPhysicsSim.getInstance().addSparkMax(Drivetrain.leftMotor1, DCMotor.getNEO(1));
+    REVPhysicsSim.getInstance().addSparkMax(Drivetrain.leftMotor2, DCMotor.getNEO(1));
+    REVPhysicsSim.getInstance().addSparkMax(Drivetrain.rightMotor1, DCMotor.getNEO(1));
+    REVPhysicsSim.getInstance().addSparkMax(Drivetrain.rightMotor2, DCMotor.getNEO(1));
+  }
 
   /** This function is called periodically whilst in simulation. */
   @Override
-  public void simulationPeriodic() {}
+  public void simulationPeriodic() {
+    double drawCurrent = m_robotContainer.getRobotDrive().getDrawnCurrentAmps();
+    double loadedVoltage = BatterySim.calculateDefaultBatteryLoadedVoltage(drawCurrent);
+    RoboRioSim.setVInVoltage(loadedVoltage);
+    REVPhysicsSim.getInstance().run();
+  }
 }
